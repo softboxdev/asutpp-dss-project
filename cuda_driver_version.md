@@ -1,0 +1,1 @@
+sudo docker run --rm --gpus all nvidia/cuda:12.9.2-base-ubuntu24.04 nvidia-smi
