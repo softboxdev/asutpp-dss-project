@@ -242,6 +242,7 @@ poetry install
 
 # 6. Проверить
 # Активация виртуального окружения
+
 poetry shell
 python --version
 python -c "import numpy, spacy, torch; print('OK')"
