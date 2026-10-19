@@ -1,0 +1,163 @@
+"""
+Оркестратор DSAL-цикла обучения.
+"""
+import torch
+import numpy as np
+from pathlib import Path
+from typing import Dict, List, Callable
+from loguru import logger
+
+from src.dsal.data_generator import SyntheticDataGenerator
+from src.dsal.hard_negative_gen import HardNegativeGenerator
+from src.deepseek.local_client import get_deepseek_client
+
+
+class DSALOrchestrator:
+    """
+    Оркестратор DeepSeek-Assisted Learning.
+    """
+    
+    def __init__(
+        self,
+        main_model: torch.nn.Module,
+        output_dir: str = "models/dsal"
+    ):
+        self.main_model = main_model
+        self.output_dir = Path(output_dir)
+        self.output_dir.mkdir(parents=True, exist_ok=True)
+        
+        # Компоненты
+        self.client = get_deepseek_client()
+        self.data_generator = SyntheticDataGenerator()
+        self.hard_neg_gen = HardNegativeGenerator()
+        
+        logger.info("DSALOrchestrator инициализирован")
+    
+    def train_epoch(
+        self,
+        labeled_data: List[Dict],
+        unlabeled_data: List[str],
+        batch_size: int = 16,
+        alpha: float = 0.7,
+        beta: float = 0.3
+    ) -> Dict[str, float]:
+        """
+        Одна эпоха обучения с DeepSeek-ассистированием.
+        
+        Args:
+            labeled_data: размеченные данные
+            unlabeled_data: неразмеченные ТЗ
+            batch_size: размер батча
+            alpha: вес собственной задачи
+            beta: вес дистилляции
+        
+        Returns:
+            Метрики эпохи
+        """
+        metrics = {
+            'task_loss': 0.0,
+            'distill_loss': 0.0,
+            'contrast_loss': 0.0,
+            'total_loss': 0.0,
+        }
+        
+        # 1. Обучение на размеченных данных
+        logger.info("Фаза 1: Обучение на размеченных данных")
+        task_loss = self._train_supervised(labeled_data, batch_size)
+        metrics['task_loss'] = task_loss
+        
+        # 2. Генерация синтетических данных
+        logger.info("Фаза 2: Генерация синтетических данных")
+        synthetic = self.data_generator.generate_from_document(
+            '\n\n'.join(unlabeled_data[:5])  # ограничение
+        )
+        
+        # 3. Дистилляция знаний
+        logger.info("Фаза 3: Дистилляция знаний из DeepSeek")
+        distill_loss = self._train_distillation(synthetic, batch_size)
+        metrics['distill_loss'] = distill_loss
+        
+        # 4. Контрастивное обучение
+        logger.info("Фаза 4: Контрастивное обучение")
+        positives = self._extract_positives(labeled_data)
+        triplets = self.hard_neg_gen.generate(positives[:20])
+        contrast_loss = self._train_contrastive(triplets, batch_size)
+        metrics['contrast_loss'] = contrast_loss
+        
+        # Итоговая loss
+        metrics['total_loss'] = (
+            alpha * metrics['task_loss'] +
+            beta * metrics['distill_loss'] +
+            (1 - alpha - beta) * metrics['contrast_loss']
+        )
+        
+        logger.info(f"Эпоха завершена: {metrics}")
+        return metrics
+    
+    def _train_supervised(
+        self,
+        data: List[Dict],
+        batch_size: int
+    ) -> float:
+        """Обучение на размеченных данных."""
+        # ... логика обучения
+        return 0.5
+    
+    def _train_distillation(
+        self,
+        synthetic: List[Dict],
+        batch_size: int
+    ) -> float:
+        """Дистилляция знаний."""
+        # ... логика дистилляции
+        return 0.3
+    
+    def _train_contrastive(
+        self,
+        triplets: List[Dict],
+        batch_size: int
+    ) -> float:
+        """Контрастивное обучение."""
+        # ... логика контрастивного обучения
+        return 0.2
+    
+    def _extract_positives(self, data: List[Dict]) -> List[str]:
+        """Извлечение положительных примеров."""
+        positives = []
+        for sample in data:
+            for entity in sample.get('entities', []):
+                positives.append(entity.get('text', ''))
+        return positives
+    
+    def run_full_cycle(
+        self,
+        labeled_data: List[Dict],
+        unlabeled_data: List[str],
+        epochs: int = 10
+    ):
+        """Полный DSAL-цикл."""
+        logger.info(f"Запуск DSAL-цикла на {epochs} эпох")
+        
+        for epoch in range(epochs):
+            logger.info(f"=== Эпоха {epoch + 1}/{epochs} ===")
+            
+            metrics = self.train_epoch(
+                labeled_data=labeled_data,
+                unlabeled_data=unlabeled_data,
+            )
+            
+            # Сохранение checkpoint
+            if (epoch + 1) % 5 == 0:
+                self._save_checkpoint(epoch, metrics)
+        
+        logger.info("DSAL-цикл завершён")
+    
+    def _save_checkpoint(self, epoch: int, metrics: Dict):
+        """Сохранение checkpoint."""
+        path = self.output_dir / f"checkpoint_epoch_{epoch+1}.pt"
+        torch.save({
+            'epoch': epoch,
+            'model_state': self.main_model.state_dict(),
+            'metrics': metrics,
+        }, path)
+        logger.info(f"Checkpoint сохранён: {path}")

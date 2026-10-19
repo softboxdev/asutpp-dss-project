@@ -1,0 +1,85 @@
+version: '3.9'
+
+services:
+  # ===== DeepSeek Inference Server =====
+  deepseek:
+    image: vllm/vllm-openai:latest
+    container_name: asutp-deepseek
+    runtime: nvidia
+    environment:
+      - NVIDIA_VISIBLE_DEVICES=all
+      - HF_HOME=/models/cache
+    ports:
+      - "8001:8001"
+    volumes:
+      - ./models/deepseek:/models/models
+      - ./models/deepseek/cache:/models/cache
+    command: >
+      --model /models/models/DeepSeek-R1-Distill-Qwen-7B
+      --host 0.0.0.0
+      --port 8001
+      --gpu-memory-utilization 0.9
+      --max-model-len 8192
+      --dtype float16
+      --trust-remote-code
+      --enable-prefix-caching
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8001/v1/models"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    restart: unless-stopped
+    networks:
+      - asutp-local
+
+  # ===== API =====
+  api:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.api
+    container_name: asutp-api
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./src:/app/src
+      - ./data:/app/data
+      - ./models:/app/models
+      - ./configs:/app/configs
+    environment:
+      - DEEPSEEK_HOST=deepseek
+      - DEEPSEEK_PORT=8001
+      - SQLITE_PATH=/app/data/asutp.db
+    depends_on:
+      deepseek:
+        condition: service_healthy
+    networks:
+      - asutp-local
+
+  # ===== Streamlit UI =====
+  ui:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.ui
+    container_name: asutp-ui
+    ports:
+      - "8501:8501"
+    volumes:
+      - ./src:/app/src
+      - ./data:/app/data
+    environment:
+      - API_URL=http://api:8000
+    depends_on:
+      - api
+    networks:
+      - asutp-local
+
+networks:
+  asutp-local:
+    driver: bridge

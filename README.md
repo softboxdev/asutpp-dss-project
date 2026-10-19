@@ -345,3 +345,35 @@ EOF
 ```
 
 
+# Полный сценарий запуска
+```bash
+# 1. Клонирование / создание проекта
+cd ~/projects/asutp-dss-local
+
+# 2. Установка зависимостей
+poetry install
+
+# 3. Настройка окружения
+cp .env.example .env
+vim .env  # при необходимости
+
+# 4. Загрузка модели DeepSeek
+make download-model
+
+# 5. Запуск DeepSeek сервера (в фоне)
+make start-deepseek-bg
+
+# 6. Ожидание загрузки модели (2-5 минут)
+sleep 180
+make check-deepseek
+
+# 7. Подготовка данных
+poetry run python scripts/prepare_data.py
+
+# 8. Тестовый запуск
+make run-cli
+
+# 9. Запуск UI
+make run-ui
+# Открыть http://localhost:8501
+```
