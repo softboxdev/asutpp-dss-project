@@ -377,3 +377,57 @@ make run-cli
 make run-ui
 # Открыть http://localhost:8501
 ```
+
+# Пример использования
+```python
+"""
+Полный пример работы с локальной DeepSeek.
+"""
+import sys
+sys.path.insert(0, '/home/user/projects/asutp-dss-local')
+
+from src.pipeline.orchestrator import ArchitectureDesignPipeline
+from src.dsal.orchestrator import DSALOrchestrator
+from src.deepseek.local_client import get_deepseek_client
+
+# 1. Проверка DeepSeek
+client = get_deepseek_client()
+print("DeepSeek доступен")
+
+# 2. Тестовый запрос
+response = client.generate(
+    "Извлеки сущности: Система должна контролировать температуру 150-200°C",
+    max_tokens=512
+)
+print(f"DeepSeek ответил:\n{response[:500]}")
+
+# 3. Полный конвейер
+pipeline = ArchitectureDesignPipeline()
+
+with open('data/test_examples/chemical_reactor_tz.txt', 'r') as f:
+    tz_text = f.read()
+
+context = {
+    'team_size': 8,
+    'budget_million_rub': 15,
+    'timeline_months': 8,
+    'real_time_critical': True,
+    'safety_level_sil': 2,
+}
+
+result = pipeline.run(tz_text, context, verbose=True)
+
+# 4. DSAL-обучение
+dsal = DSALOrchestrator(main_model=None)  # заменить на реальную модель
+
+labeled_data = [{'text': 'пример', 'entities': []}]
+unlabeled_data = [tz_text]
+
+dsal.run_full_cycle(
+    labeled_data=labeled_data,
+    unlabeled_data=unlabeled_data,
+    epochs=5
+)
+
+print("✅ Всё работает полностью локально")
+```
