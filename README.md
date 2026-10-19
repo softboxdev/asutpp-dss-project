@@ -431,3 +431,32 @@ dsal.run_full_cycle(
 
 print("✅ Всё работает полностью локально")
 ```
+
+# Итоговая структура и запуск
+
+```bash
+# ============ УСТАНОВКА (один раз) ============
+cd ~/projects/asutp-dss-local
+
+# 1. Установка зависимостей
+poetry install
+
+# 2. Загрузка DeepSeek модели (5-10 минут)
+make download-model
+
+# ============ ЗАПУСК (каждый раз) ============
+
+# 3. Запуск DeepSeek сервера
+make start-deepseek-bg
+
+# 4. Проверка готовности (2-5 минут)
+make check-deepseek
+
+# 5. Запуск CLI или UI
+make run-cli
+# или
+make run-ui
+
+# ============ ОСТАНОВКА ============
+make stop-deepseek
+```
