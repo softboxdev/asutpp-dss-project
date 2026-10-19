@@ -1,0 +1,73 @@
+{
+  "concepts": {
+    "sensor": {
+      "keywords": ["датчик", "сенсор", "измеритель", "преобразователь"],
+      "weight": 1.0,
+      "attributes": ["тип", "диапазон", "точность", "протокол"]
+    },
+    "controller": {
+      "keywords": ["контроллер", "плк", "промышленный контроллер", "программируемый"],
+      "weight": 1.0,
+      "attributes": ["модель", "память", "интерфейсы", "производительность"]
+    },
+    "actuator": {
+      "keywords": ["клапан", "исполнительный механизм", "привод", "насос"],
+      "weight": 1.0,
+      "attributes": ["тип", "управление", "диапазон"]
+    },
+    "requirement_functional": {
+      "keywords": ["должна", "должен", "должно", "обеспечивать", "выполнять"],
+      "weight": 0.8,
+      "attributes": ["id", "приоритет", "источник"]
+    },
+    "requirement_safety": {
+      "keywords": ["sil", "безопасность", "аварийный", "защита", "отказобезопасность"],
+      "weight": 1.5,
+      "attributes": ["уровень_sil", "стандарт", "критичность"]
+    },
+    "requirement_performance": {
+      "keywords": ["время отклика", "производительность", "задержка", "пропускная способность", "real-time"],
+      "weight": 1.2,
+      "attributes": ["метрика", "значение", "единица"]
+    },
+    "requirement_reliability": {
+      "keywords": ["надежность", "доступность", "отказоустойчивость", "mtbf", "mttr", "резервирование"],
+      "weight": 1.2,
+      "attributes": ["метрика", "значение"]
+    },
+    "interface": {
+      "keywords": ["интерфейс", "протокол", "opc ua", "modbus", "profinet", "integration", "scada", "mes"],
+      "weight": 1.0,
+      "attributes": ["тип", "стандарт", "сторона"]
+    },
+    "technology_stack": {
+      "keywords": ["siemens", "rockwell", "schneider", "abb", "codesys", "tia portal", "wincc"],
+      "weight": 0.9,
+      "attributes": ["производитель", "линейка", "версия"]
+    },
+    "constraint": {
+      "keywords": ["ограничение", "не более", "не менее", "максимум", "минимум"],
+      "weight": 1.0,
+      "attributes": ["тип", "значение", "единица"]
+    }
+  },
+  "entity_types": [
+    "sensor",
+    "controller",
+    "actuator",
+    "requirement_functional",
+    "requirement_safety",
+    "requirement_performance",
+    "requirement_reliability",
+    "interface",
+    "technology_stack",
+    "constraint"
+  ],
+  "relations": {
+    "controls": ["controller", "actuator"],
+    "measures": ["sensor", "requirement_functional"],
+    "requires": ["requirement_functional", "technology_stack"],
+    "constrains": ["constraint", "requirement_functional"],
+    "integrates": ["interface", "controller"]
+  }
+}
