@@ -460,3 +460,139 @@ make run-ui
 # ============ ОСТАНОВКА ============
 make stop-deepseek
 ```
+
+
+# Структура проекта
+
+```text
+asutp-dss-local/
+.
+├── configs
+│   ├── deployment_configs
+│   ├── dsal_configs
+│   └── model_configs
+├── cuda_driver_version.md
+├── data
+│   ├── ontology
+│   │   └── asutp_ontology.json
+│   ├── processed
+│   ├── raw
+│   ├── synthetic
+│   └── test_examples
+│       └── chemical_reactor_tz.txt
+├── docker
+│   ├── Dockerfile.ai
+│   ├── Dockerfile.api
+│   ├── Dockerfile.ml
+│   ├── grafana
+│   └── prometheus
+├── docker-compose.deepseek.yml
+├── docker-compose.yml
+├── docs
+│   ├── api
+│   ├── architecture
+│   └── user_guide
+├── logs
+├── Makefile
+├── models
+│   ├── classifier
+│   ├── dacie
+│   ├── deepseek
+│   ├── generator
+│   ├── optimizer
+│   └── production
+├── notebooks
+│   ├── analysis
+│   └── experiments
+├── old_configs
+│   ├── poetry.lock
+│   ├── pyproject.toml
+│   └── README.md
+├── poetry.lock
+├── pyproject.toml
+├── README.md
+├── results
+├── scripts
+│   ├── benchmark.py
+│   ├── check_ai_server.sh
+│   ├── download_ai_server.sh
+│   ├── download_deepseek.sh
+│   ├── prepare_data.py
+│   ├── start_ai_server.sh
+│   ├── test_local_setup.py
+│   └── train_all.py
+├── src
+│   ├── ai_service
+│   │   ├── cache.py
+│   │   ├── inference_server.py
+│   │   ├── __init__.py
+│   │   ├── local_client.py
+│   │   ├── model_loader.py
+│   │   ├── problem_solving.md
+│   │   └── prompts
+│   │       ├── complexity_estimation.py
+│   │       ├── entity_extraction.py
+│   │       ├── hard_negatives.py
+│   │       └── requirement_classification.py
+│   ├── core
+│   │   ├── config.py
+│   │   ├── __init__.py
+│   │   ├── logging.py
+│   │   └── paths.py
+│   ├── dsal
+│   │   ├── active_learner.py
+│   │   ├── data_generator.py
+│   │   ├── distiller.py
+│   │   ├── hard_negative_gen.py
+│   │   ├── hybrid_inference.py
+│   │   ├── __init__.py
+│   │   └── orchestrator.py
+│   ├── __init__.py
+│   ├── ml
+│   │   ├── classifier
+│   │   │   ├── features.py
+│   │   │   ├── __init__.py
+│   │   │   ├── neural_ranker.py
+│   │   │   └── xgboost_model.py
+│   │   ├── dacie
+│   │   │   ├── entity_extractor.py
+│   │   │   ├── graph_builder.py
+│   │   │   ├── __init__.py
+│   │   │   ├── neural_encoder.py
+│   │   │   ├── parser.py
+│   │   │   └── symbolic_rules.py
+│   │   ├── evaluator
+│   │   │   ├── __init__.py
+│   │   │   ├── multi_task.py
+│   │   │   ├── pareto.py
+│   │   │   └── simulator.py
+│   │   ├── generator
+│   │   │   ├── architecture_encoder.py
+│   │   │   ├── __init__.py
+│   │   │   └── vae.py
+│   │   ├── __init__.py
+│   │   ├── optimizer
+│   │   │   ├── gnn.py
+│   │   │   ├── __init__.py
+│   │   │   ├── nsga2.py
+│   │   │   └── placement.py
+│   │   └── xai
+│   │       ├── __init__.py
+│   │       └── shap_analyzer.py
+│   ├── pipeline
+│   │   ├── __init__.py
+│   │   └── orchestrator.py
+│   ├── storage
+│   │   ├── cache.py
+│   │   ├── file_store.py
+│   │   ├── __init__.py
+│   │   └── sqlite_db.py
+│   └── ui
+│       ├── cli.py
+│       ├── __init__.py
+│       └── streamlit_app.py
+└── tests
+    ├── e2e
+    ├── integration
+    └── unit
+```
