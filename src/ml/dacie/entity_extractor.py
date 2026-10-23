@@ -89,7 +89,7 @@ class DACIE:
                 prompt=build_entity_extraction_prompt(text),
                 system_prompt=ENTITY_EXTRACTION_SYSTEM,
                 temperature=0.1,
-                max_tokens=2048,
+                max_tokens=4096,
             )
             return self._parse_json(response)
         except Exception as e:

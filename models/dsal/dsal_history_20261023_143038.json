@@ -1,0 +1,10 @@
+[
+  {
+    "task_loss": 0.0,
+    "distill_loss": 0.0,
+    "contrast_loss": 0.0,
+    "total_loss": 0.0,
+    "synthetic_count": 1,
+    "triplets_count": 2
+  }
+]
