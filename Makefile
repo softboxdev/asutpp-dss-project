@@ -32,6 +32,9 @@ test-ai: ## Тест запроса
 run-cli: ## CLI
 	poetry run python -m src.main analyze
 
+analyze: ## Запустить анализ
+	poetry run python -m src.main analyze
+
 run-ui: ## Streamlit UI
 	poetry run streamlit run src/ui/streamlit_app.py
 
