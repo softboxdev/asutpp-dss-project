@@ -596,3 +596,9 @@ asutp-dss-local/
     ├── integration
     └── unit
 ```
+
+# Проверка проект
+```bash
+cd ~/projects/asutp-dss-local
+poetry run python -m src.main check
+```

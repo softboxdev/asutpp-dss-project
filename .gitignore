@@ -1,0 +1,35 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+
+# Poetry
+poetry.lock
+
+# IDE
+.vscode/
+.idea/
+*.swp
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Проект
+.env
+logs/*.log
+results/*
+models/**/*.bin
+models/**/*.pt
+models/**/*.pkl
+data/cache/*
+data/processed/*
+data/synthetic/*
+!data/raw/.gitkeep
+!data/test_examples/*.txt
+!data/ontology/*.json
+
+# Jupyter
+.ipynb_checkpoints/
