@@ -778,7 +778,7 @@ from loguru import logger
 from openai import OpenAI
 
 
-class LocalDeepSeekClient:
+class LocalAIClient:
     """
     Клиент для взаимодействия с локальным DeepSeek через vLLM.
     """
@@ -810,7 +810,7 @@ class LocalDeepSeekClient:
         # Проверка подключения
         self._check_connection()
         
-        logger.info(f"LocalDeepSeekClient готов: {base_url}")
+        logger.info(f"LocalAIClient готов: {base_url}")
     
     def _check_connection(self):
         """Проверка доступности сервера."""
@@ -943,14 +943,14 @@ class LocalDeepSeekClient:
 
 
 # Singleton
-_client: Optional[LocalDeepSeekClient] = None
+_client: Optional[LocalAIClient] = None
 
 
-def get_deepseek_client() -> LocalDeepSeekClient:
+def get_ai_client() -> LocalAIClient:
     """Получить singleton-клиент DeepSeek."""
     global _client
     if _client is None:
-        _client = LocalDeepSeekClient()
+        _client = LocalAIClient()
     return _client
 ```
 
@@ -1058,8 +1058,8 @@ from typing import List, Dict, Any
 import json
 from loguru import logger
 
-from src.deepseek.local_client import get_deepseek_client
-from src.deepseek.prompts.entity_extraction import (
+from src.ai_service.local_client import get_ai_client
+from src.ai_service.prompts.entity_extraction import (
     ENTITY_EXTRACTION_SYSTEM,
     build_entity_extraction_prompt
 )
@@ -1089,7 +1089,7 @@ class DACIE:
         # DeepSeek клиент
         if use_deepseek:
             try:
-                self.deepseek = get_deepseek_client()
+                self.deepseek = get_ai_client()
                 logger.info("DeepSeek ассистент подключён")
             except Exception as e:
                 logger.warning(f"DeepSeek недоступен: {e}. Работаем без него.")
@@ -1265,8 +1265,8 @@ from pathlib import Path
 from typing import List, Dict, Tuple
 from loguru import logger
 
-from src.deepseek.local_client import get_deepseek_client
-from src.deepseek.prompts.entity_extraction import (
+from src.ai_service.local_client import get_ai_client
+from src.ai_service.prompts.entity_extraction import (
     ENTITY_EXTRACTION_SYSTEM,
     build_entity_extraction_prompt
 )
@@ -1282,7 +1282,7 @@ class SyntheticDataGenerator:
         confidence_threshold: float = 0.85,
         output_dir: str = "data/synthetic"
     ):
-        self.client = get_deepseek_client()
+        self.client = get_ai_client()
         self.confidence_threshold = confidence_threshold
         self.output_dir = Path(output_dir)
         self.output_dir.mkdir(parents=True, exist_ok=True)
@@ -1403,8 +1403,8 @@ class SyntheticDataGenerator:
 from typing import List, Dict
 from loguru import logger
 
-from src.deepseek.local_client import get_deepseek_client
-from src.deepseek.prompts.hard_negatives import (
+from src.ai_service.local_client import get_ai_client
+from src.ai_service.prompts.hard_negatives import (
     HARD_NEGATIVES_SYSTEM,
     build_hard_negatives_prompt
 )
@@ -1416,7 +1416,7 @@ class HardNegativeGenerator:
     """
     
     def __init__(self):
-        self.client = get_deepseek_client()
+        self.client = get_ai_client()
         logger.info("HardNegativeGenerator инициализирован")
     
     def generate(
@@ -1495,7 +1495,7 @@ from loguru import logger
 
 from src.dsal.data_generator import SyntheticDataGenerator
 from src.dsal.hard_negative_gen import HardNegativeGenerator
-from src.deepseek.local_client import get_deepseek_client
+from src.ai_service.local_client import get_ai_client
 
 
 class DSALOrchestrator:
@@ -1513,7 +1513,7 @@ class DSALOrchestrator:
         self.output_dir.mkdir(parents=True, exist_ok=True)
         
         # Компоненты
-        self.client = get_deepseek_client()
+        self.client = get_ai_client()
         self.data_generator = SyntheticDataGenerator()
         self.hard_neg_gen = HardNegativeGenerator()
         
@@ -2035,8 +2035,8 @@ def test_environment():
     
     # 2. Проверка DeepSeek сервера
     try:
-        from src.deepseek.local_client import get_deepseek_client
-        client = get_deepseek_client()
+        from src.ai_service.local_client import get_ai_client
+        client = get_ai_client()
         print(f"✅ DeepSeek сервер доступен")
         
         # Тестовый запрос
@@ -2099,10 +2099,10 @@ sys.path.insert(0, '/home/user/projects/asutp-dss-local')
 
 from src.pipeline.orchestrator import ArchitectureDesignPipeline
 from src.dsal.orchestrator import DSALOrchestrator
-from src.deepseek.local_client import get_deepseek_client
+from src.ai_service.local_client import get_ai_client
 
 # 1. Проверка DeepSeek
-client = get_deepseek_client()
+client = get_ai_client()
 print("DeepSeek доступен")
 
 # 2. Тестовый запрос

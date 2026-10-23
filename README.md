@@ -388,10 +388,10 @@ sys.path.insert(0, '/home/user/projects/asutp-dss-local')
 
 from src.pipeline.orchestrator import ArchitectureDesignPipeline
 from src.dsal.orchestrator import DSALOrchestrator
-from src.deepseek.local_client import get_deepseek_client
+from src.ai_service.local_client import get_ai_client
 
 # 1. Проверка DeepSeek
-client = get_deepseek_client()
+client = get_ai_client()
 print("DeepSeek доступен")
 
 # 2. Тестовый запрос

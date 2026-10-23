@@ -4,8 +4,8 @@
 from typing import List, Dict
 from loguru import logger
 
-from src.deepseek.local_client import get_deepseek_client
-from src.deepseek.prompts.hard_negatives import (
+from src.ai_service.local_client import get_ai_client
+from src.ai_service.prompts.hard_negatives import (
     HARD_NEGATIVES_SYSTEM,
     build_hard_negatives_prompt
 )
@@ -17,7 +17,7 @@ class HardNegativeGenerator:
     """
     
     def __init__(self):
-        self.client = get_deepseek_client()
+        self.client = get_ai_client()
         logger.info("HardNegativeGenerator инициализирован")
     
     def generate(

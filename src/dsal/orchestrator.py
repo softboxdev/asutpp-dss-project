@@ -9,7 +9,7 @@ from loguru import logger
 
 from src.dsal.data_generator import SyntheticDataGenerator
 from src.dsal.hard_negative_gen import HardNegativeGenerator
-from src.deepseek.local_client import get_deepseek_client
+from src.ai_service.local_client import get_ai_client
 
 
 class DSALOrchestrator:
@@ -27,7 +27,7 @@ class DSALOrchestrator:
         self.output_dir.mkdir(parents=True, exist_ok=True)
         
         # Компоненты
-        self.client = get_deepseek_client()
+        self.client = get_ai_client()
         self.data_generator = SyntheticDataGenerator()
         self.hard_neg_gen = HardNegativeGenerator()
         

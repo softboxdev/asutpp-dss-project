@@ -6,8 +6,8 @@ from pathlib import Path
 from typing import List, Dict, Tuple
 from loguru import logger
 
-from src.deepseek.local_client import get_deepseek_client
-from src.deepseek.prompts.entity_extraction import (
+from src.ai_service.local_client import get_ai_client
+from src.ai_service.prompts.entity_extraction import (
     ENTITY_EXTRACTION_SYSTEM,
     build_entity_extraction_prompt
 )
@@ -23,7 +23,7 @@ class SyntheticDataGenerator:
         confidence_threshold: float = 0.85,
         output_dir: str = "data/synthetic"
     ):
-        self.client = get_deepseek_client()
+        self.client = get_ai_client()
         self.confidence_threshold = confidence_threshold
         self.output_dir = Path(output_dir)
         self.output_dir.mkdir(parents=True, exist_ok=True)

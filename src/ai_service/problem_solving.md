@@ -337,7 +337,7 @@ from pathlib import Path
 from loguru import logger
 from openai import OpenAI
 
-class LocalDeepSeekClient:
+class LocalAIClient:
     """Клиент для DeepSeek через Ollama."""
     
     def __init__(
@@ -373,7 +373,7 @@ class LocalDeepSeekClient:
         
         # Проверка подключения
         self._check_connection()
-        logger.info(f"LocalDeepSeekClient готов: {self.base_url}")
+        logger.info(f"LocalAIClient готов: {self.base_url}")
     
     def _check_connection(self):
         """Проверка доступности Ollama."""
@@ -485,14 +485,14 @@ class LocalDeepSeekClient:
         return results
 
 
-_client: Optional[LocalDeepSeekClient] = None
+_client: Optional[LocalAIClient] = None
 
 
-def get_deepseek_client() -> LocalDeepSeekClient:
+def get_ai_client() -> LocalAIClient:
     """Singleton клиент."""
     global _client
     if _client is None:
-        _client = LocalDeepSeekClient()
+        _client = LocalAIClient()
     return _client
 PYEOF
 ```

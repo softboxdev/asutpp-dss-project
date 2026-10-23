@@ -1,0 +1,198 @@
+"""
+DACIE с интеграцией локального DeepSeek.
+"""
+import torch
+from transformers import AutoTokenizer, AutoModel
+import networkx as nx
+from typing import List, Dict, Any
+import json
+from loguru import logger
+
+from src.ai_service.local_client import get_ai_client
+from src.ai_service.prompts.entity_extraction import (
+    ENTITY_EXTRACTION_SYSTEM,
+    build_entity_extraction_prompt
+)
+
+
+class DACIE:
+    """
+    Нейро-символьный извлекатель сущностей с DeepSeek-ассистированием.
+    """
+    
+    def __init__(
+        self,
+        model_name: str = "microsoft/deberta-v3-base",
+        use_ai: bool = True,
+        confidence_threshold: float = 0.85
+    ):
+        self.use_ai = use_ai
+        self.confidence_threshold = confidence_threshold
+        
+        # Локальная нейросетевая модель
+        self.tokenizer = AutoTokenizer.from_pretrained(model_name)
+        self.neural_encoder = AutoModel.from_pretrained(model_name)
+        
+        # Онтология
+        self.ontology = self._load_ontology()
+        
+        # DeepSeek клиент
+        if use_ai:
+            try:
+                self.deepseek = get_ai_client()
+                logger.info("DeepSeek ассистент подключён")
+            except Exception as e:
+                logger.warning(f"DeepSeek недоступен: {e}. Работаем без него.")
+                self.use_deepseek = False
+                self.deepseek = None
+    
+    def _load_ontology(self) -> Dict:
+        with open("data/ontology/asutp_ontology.json", "r", encoding="utf-8") as f:
+            return json.load(f)
+    
+    def extract_with_deepseek(
+        self,
+        text: str
+    ) -> List[Dict[str, Any]]:
+        """
+        Извлечение сущностей через DeepSeek.
+        Используется как ассистент для сложных случаев.
+        """
+        if not self.use_deepseek:
+            return []
+        
+        prompt = build_entity_extraction_prompt(text)
+        
+        try:
+            response = self.deepseek.generate(
+                prompt=prompt,
+                system_prompt=ENTITY_EXTRACTION_SYSTEM,
+                temperature=0.1,
+                max_tokens=2048
+            )
+            
+            # Парсинг JSON
+            entities = self._parse_deepseek_response(response)
+            return entities
+        
+        except Exception as e:
+            logger.error(f"Ошибка DeepSeek: {e}")
+            return []
+    
+    def _parse_deepseek_response(self, response: str) -> List[Dict]:
+        """Парсинг ответа DeepSeek."""
+        try:
+            # Извлечение JSON из ответа
+            start = response.find('{')
+            end = response.rfind('}') + 1
+            if start == -1 or end == 0:
+                return []
+            
+            json_str = response[start:end]
+            data = json.loads(json_str)
+            return data.get('entities', [])
+        
+        except json.JSONDecodeError as e:
+            logger.warning(f"Ошибка парсинга JSON: {e}")
+            return []
+    
+    def hybrid_extract(
+        self,
+        graph: nx.DiGraph,
+        neural_emb: Dict,
+        symbolic_feat: Dict
+    ) -> List[Dict[str, Any]]:
+        """
+        Гибридное извлечение: собственная модель + DeepSeek.
+        """
+        # 1. Собственное извлечение
+        own_entities = self._extract_own_model(graph, neural_emb, symbolic_feat)
+        
+        # 2. DeepSeek для неуверенных случаев
+        if self.use_deepseek:
+            uncertain_texts = [
+                e for e in own_entities
+                if e['confidence'] < self.confidence_threshold
+            ]
+            
+            if uncertain_texts:
+                logger.info(f"DeepSeek для {len(uncertain_texts)} "
+                           f"неуверенных случаев")
+                
+                deepseek_entities = []
+                for entity in uncertain_texts[:5]:  # ограничение
+                    text = graph.nodes[entity['node_id']]['text']
+                    ds_entities = self.extract_with_deepseek(text)
+                    deepseek_entities.extend(ds_entities)
+                
+                # Объединение
+                own_entities = self._merge_entities(
+                    own_entities,
+                    deepseek_entities
+                )
+        
+        return own_entities
+    
+    def _extract_own_model(self, graph, neural_emb, symbolic_feat):
+        """Собственное извлечение (существующий алгоритм)."""
+        # ... (существующая логика)
+        return []
+    
+    def _merge_entities(self, own: List, deepseek: List) -> List:
+        """Объединение результатов от разных источников."""
+        merged = list(own)
+        
+        for ds_entity in deepseek:
+            # Проверка на дубликат
+            is_duplicate = False
+            for own_entity in own:
+                if (ds_entity.get('text', '').lower() == 
+                    own_entity.get('text', '').lower()):
+                    is_duplicate = True
+                    break
+            
+            if not is_duplicate:
+                merged.append({
+                    'text': ds_entity.get('text', ''),
+                    'type': ds_entity.get('type', 'unknown'),
+                    'confidence': ds_entity.get('confidence', 0.8),
+                    'source': 'deepseek'
+                })
+        
+        return merged
+    
+    def process(
+        self,
+        document_text: str,
+        use_deepseek: bool = True
+    ) -> Dict[str, Any]:
+        """
+        Полный пайплайн DACIE с DeepSeek.
+        """
+        logger.info("DACIE: начало обработки")
+        
+        # 1. Граф документа
+        graph = self.build_document_graph(document_text)
+        logger.info(f"Граф: {graph.number_of_nodes()} узлов")
+        
+        # 2. Нейронное кодирование
+        neural_emb = self.neural_encode(graph)
+        
+        # 3. Символьные признаки
+        symbolic_feat = self.symbolic_features(graph)
+        
+        # 4. Гибридное извлечение
+        if use_deepseek and self.use_deepseek:
+            entities = self.hybrid_extract(graph, neural_emb, symbolic_feat)
+        else:
+            combined = self.compositional_fusion(neural_emb, symbolic_feat)
+            entities = self._extract_own_model(graph, neural_emb, symbolic_feat)
+        
+        logger.info(f"Извлечено сущностей: {len(entities)}")
+        
+        return {
+            'graph': graph,
+            'entities': entities,
+            'neural_embeddings': neural_emb,
+            'symbolic_features': symbolic_feat,
+        }

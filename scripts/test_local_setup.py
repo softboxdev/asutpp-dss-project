@@ -25,8 +25,8 @@ def test_environment():
     
     # 2. Проверка DeepSeek сервера
     try:
-        from src.deepseek.local_client import get_deepseek_client
-        client = get_deepseek_client()
+        from src.ai_service.local_client import get_ai_client
+        client = get_ai_client()
         print(f"✅ DeepSeek сервер доступен")
         
         # Тестовый запрос
