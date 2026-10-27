@@ -47,3 +47,14 @@ check: ## Проверка системы
 clean: ## Очистка
 	find . -type d -name "__pycache__" -exec rm -rf {} + 2>/dev/null
 	rm -rf .pytest_cache htmlcov .coverage
+generate-tz: ## Сгенерировать тестовые ТЗ (все отрасли)
+	poetry run python scripts/generate_test_tz.py --all
+
+generate-tz-one: ## Сгенерировать одно ТЗ (chemical)
+	poetry run python scripts/generate_test_tz.py --domain chemical
+
+list-domains: ## Показать доступные отрасли
+	poetry run python scripts/generate_test_tz.py --list
+
+test-tz: ## Проверить сгенерированное ТЗ через конвейер
+	poetry run python -m src.main analyze --input data/test_examples/chemical_tz.txt

@@ -125,10 +125,10 @@ def analyze(
             )
         console.print(t)
     else:
-        console.print("  [yellow]Не найдено[/yellow]")
+        console.print("[yellow] Не найдено[/yellow]")
     
     # Паттерны
-    console.print("\n🏗️  Паттерны:")
+    console.print("\n  Паттерны:")
     if result.patterns:
         t = Table()
         t.add_column("№", justify="right")

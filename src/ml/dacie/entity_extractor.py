@@ -1,4 +1,4 @@
-"""DACIE — извлечение сущностей из ТЗ."""
+"""DACIE Domain-Adaptive Compositional Information Extractor — извлечение сущностей из ТЗ."""
 import json
 import re
 from pathlib import Path
