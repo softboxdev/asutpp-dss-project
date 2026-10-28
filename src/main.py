@@ -72,6 +72,10 @@ def analyze(
     sil: int = typer.Option(2),
     real_time: bool = typer.Option(True),
     no_ai: bool = typer.Option(False, "--no-ai"),
+    full_report: bool = typer.Option(
+        False, "--full-report", "-f",
+        help="Сгенерировать расширенный отчёт"
+    ),
 ):
     """Полный конвейер анализа."""
     console.print(Panel.fit("🚀 Запуск анализа", style="bold green"))
@@ -94,69 +98,103 @@ def analyze(
         'num_external_systems': 3,
         'has_scada_integration': True,
         'has_mes_integration': False,
+        'num_io_points': 500,
+        'num_control_loops': 25,
+        'data_volume_gb_per_day': 10,
     }
     
-    try:
-        from src.pipeline.orchestrator import ArchitectureDesignPipeline
-        pipeline = ArchitectureDesignPipeline(use_ai=not no_ai)
-        result = pipeline.run(tz, context, verbose=True)
-    except Exception as e:
-        console.print(f"[red]❌ {e}[/red]")
-        logger.exception(e)
-        raise typer.Exit(1)
+    # Запуск конвейера
+    from src.pipeline.orchestrator import ArchitectureDesignPipeline
+    pipeline = ArchitectureDesignPipeline(use_ai=not no_ai)
+    result = pipeline.run(tz, context, verbose=True)
     
-    # Сущности
-    console.print("\n📋 Сущности:")
-    if result.requirements.get('entities'):
-        t = Table()
-        t.add_column("Тип", style="cyan")
-        t.add_column("Текст", style="white")
-        t.add_column("Источник")
-        seen = set()
-        for e in result.requirements['entities'][:10]:
-            k = (e.get('type'), e.get('text', '')[:30])
-            if k in seen:
-                continue
-            seen.add(k)
-            t.add_row(
-                e.get('type', '')[:25],
-                e.get('text', '')[:50],
-                e.get('source', ''),
-            )
-        console.print(t)
-    else:
-        console.print("[yellow] Не найдено[/yellow]")
+    # === Стандартный вывод ===
+    _print_entities(result.requirements.get('entities', []))
+    _print_patterns(result.patterns)
+    _print_quality(result.quality_assessment)
     
-    # Паттерны
-    console.print("\n  Паттерны:")
-    if result.patterns:
-        t = Table()
-        t.add_column("№", justify="right")
-        t.add_column("Паттерн", style="green")
-        t.add_column("Увер.", justify="right")
-        for i, p in enumerate(result.patterns[:5], 1):
-            t.add_row(str(i), p['pattern'], f"{p['confidence']:.1%}")
-        console.print(t)
+    # === Расширенный отчёт ===
+    if full_report:
+        console.print("\n" + "=" * 60)
+        console.print(Panel.fit("📊 РАСШИРЕННЫЙ ОТЧЁТ", style="bold cyan"))
+        console.print("=" * 60)
+        
+        from src.reporting import ReportBuilder
+        
+        builder = ReportBuilder()
+        report = builder.build(result, context)
+        
+        # Вывод узких мест
+        _print_bottlenecks(report['load']['bottlenecks'])
+        
+        # Вывод ресурсов
+        _print_resources(report['load']['resources'])
+        
+        # Вывод рекомендаций
+        _print_recommendations(report['load']['recommendations'])
+        
+        console.print(f"\n💾 Полный отчёт: {builder.output_dir}")
+        
+def _print_bottlenecks(bottlenecks: list):
+    """Вывод узких мест."""
+    console.print("\n⚠️  Узкие места:")
+    if not bottlenecks:
+        console.print("   [green]Не обнаружено ✅[/green]")
+        return
     
-    # Качество
-    if result.quality_assessment:
-        console.print("\n📊 Качество:")
-        t = Table()
-        t.add_column("Сценарий")
-        t.add_column("p95 (мс)", justify="right")
-        t.add_column("Throughput", justify="right")
-        for sc, d in result.quality_assessment.get('scenarios', {}).items():
-            t.add_row(sc, f"{d.get('p95_response_time', 0)*1000:.1f}",
-                      f"{d.get('throughput', 0):.1f}")
-        console.print(t)
-        console.print(
-            f"\n[bold green]Score: "
-            f"{result.quality_assessment.get('overall_score', 0):.4f}[/bold green]"
+    table = Table()
+    table.add_column("Компонент", style="cyan")
+    table.add_column("Тип", style="white")
+    table.add_column("Проблемы", style="yellow")
+    
+    for b in bottlenecks:
+        table.add_row(
+            b['component'],
+            b['type'],
+            ', '.join(b['issues']),
         )
-    
-    # Время
-    console.print(f"\n⏱️  Всего: {result.timings.get('total', 0):.2f}с")
+    console.print(table)
 
+
+def _print_resources(resources: dict):
+    """Вывод ресурсов."""
+    console.print("\n💻 Требуемые ресурсы (с резервом 30%):")
+    r = resources['with_reserve']
+    
+    table = Table()
+    table.add_column("Ресурс", style="cyan")
+    table.add_column("Значение", justify="right")
+    
+    table.add_row("CPU", f"{r['cpu_cores']} cores")
+    table.add_row("RAM", f"{r['ram_gb']} GB")
+    table.add_row("Диск/день", f"{r['disk_gb_per_day']} GB")
+    table.add_row("Диск/год", f"{r['disk_gb_per_year']} GB")
+    table.add_row("Сеть", f"{r['network_mbps']} Mbps")
+    console.print(table)
+
+
+def _print_recommendations(recs: list):
+    """Вывод рекомендаций."""
+    console.print("\n💡 Рекомендации:")
+    
+    table = Table()
+    table.add_column("Приоритет", style="yellow")
+    table.add_column("Компонент", style="cyan")
+    table.add_column("Рекомендация")
+    
+    for r in recs:
+        priority_style = {
+            'high': '[red]HIGH[/red]',
+            'medium': '[yellow]MED[/yellow]',
+            'low': '[green]LOW[/green]',
+        }.get(r['priority'], r['priority'])
+        
+        table.add_row(
+            priority_style,
+            r['component'],
+            r['recommendation'],
+        )
+    console.print(table)
 
 if __name__ == "__main__":
     app()
