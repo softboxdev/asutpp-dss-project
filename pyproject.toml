@@ -6,7 +6,7 @@ authors = ["Almagul Kondybayeva <soft.box.development@gmail.com>"]
 packages = [{include = "src"}]
 
 [tool.poetry.dependencies]
-python = ">=3.12,<3.13"
+python = ">=3.12"
 
 # === DeepSeek через Ollama (без vLLM!) ===
 openai = "^1.50.0"
