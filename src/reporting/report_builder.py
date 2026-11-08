@@ -1,8 +1,8 @@
-"""Сборка полного отчёта."""
+"""Сборка полного отчёта на основе секций."""
 import json
 from pathlib import Path
 from datetime import datetime
-from typing import Dict, Optional
+from typing import Dict, Optional, List
 from loguru import logger
 
 from .base import ReportSection
@@ -27,14 +27,14 @@ from .sla_metrics import SLAMetricsBuilder
 
 
 class ReportBuilder:
-    """Базовый отчёт (6 секций)."""
+    """Базовый отчёт (5-6 секций)."""
     
     def __init__(self, output_dir: str = "results/reports"):
         self.output_dir = Path(output_dir)
         self.output_dir.mkdir(parents=True, exist_ok=True)
         
-        # Секции
-        self.sections = [
+        # Базовые секции
+        self.sections: List[ReportSection] = [
             TopologyGraphBuilder(self.output_dir),
             ArchitectureExamplesGenerator(self.output_dir),
             TypicalImplementationsLibrary(self.output_dir),
@@ -42,25 +42,32 @@ class ReportBuilder:
             LoadCalculator(self.output_dir),
         ]
         
-        logger.info(f"ReportBuilder: {self.output_dir}")
+        logger.info(f"ReportBuilder: {len(self.sections)} секций")
     
-    def build(self, pipeline_result, context: Dict, run_name: str = None) -> Dict:
-        """Построить базовый отчёт."""
+    def build(
+        self,
+        pipeline_result,
+        context: Dict,
+        run_name: Optional[str] = None,
+    ) -> Dict:
+        """Построить отчёт."""
         if run_name is None:
             run_name = datetime.now().strftime("%Y%m%d_%H%M%S")
         
         run_dir = self.output_dir / f"run_{run_name}"
         run_dir.mkdir(parents=True, exist_ok=True)
         
-        # Меняем output_dir для секций
+        # Меняем output_dir у секций на run_dir
         for section in self.sections:
             section.output_dir = run_dir
         
-        report = {
+        # Базовый отчёт
+        report: Dict = {
             'metadata': {
                 'timestamp': datetime.now().isoformat(),
                 'run_name': run_name,
                 'context': context,
+                'sections_count': len(self.sections),
             },
             'summary': {
                 'entities_count': len(pipeline_result.requirements.get('entities', [])),
@@ -75,51 +82,80 @@ class ReportBuilder:
             'errors': pipeline_result.errors,
         }
         
-        # Секции
+        # Строим все секции
         for section in self.sections:
             try:
-                logger.info(f"  {section.title}...")
-                report[section.name] = section.build(pipeline_result, context)
+                logger.info(f"  Секция: {section.title}")
+                data = section.build(pipeline_result, context)
+                report[section.name] = data
             except Exception as e:
-                logger.error(f"  ❌ {section.name}: {e}")
+                logger.exception(f"  ❌ Ошибка в {section.name}: {e}")
                 report[section.name] = {'error': str(e)}
         
-        # Сохранить
+        # Сохраняем JSON и Markdown
         self._save_json(report, run_dir)
-        self._save_markdown(report, run_dir, base=True)
+        self._save_markdown(report, run_dir)
         
         logger.info(f"✅ Отчёт: {run_dir}")
         return report
     
     def _save_json(self, report: Dict, run_dir: Path):
+        """Сохранить JSON."""
         path = run_dir / "report.json"
         with open(path, 'w', encoding='utf-8') as f:
             json.dump(report, f, ensure_ascii=False, indent=2, default=str)
+        logger.info(f"   JSON: {path}")
     
-    def _save_markdown(self, report: Dict, run_dir: Path, base: bool = True):
-        lines = [
+    def _save_markdown(self, report: Dict, run_dir: Path):
+        """Сохранить Markdown."""
+        lines = self._markdown_header(report)
+        
+        # Каждая секция в своём формате
+        for section in self.sections:
+            data = report.get(section.name, {})
+            if not data or 'error' in data:
+                continue
+            
+            lines.append(f"## {section.title}")
+            lines.append("")
+            
+            try:
+                md = section.to_markdown(data)
+                if md:
+                    lines.append(md)
+                else:
+                    lines.append("```json")
+                    lines.append(json.dumps(data, ensure_ascii=False, indent=2, default=str)[:3000])
+                    lines.append("```")
+            except Exception as e:
+                lines.append(f"*Ошибка экспорта: {e}*")
+            
+            lines.append("")
+        
+        path = run_dir / "REPORT.md"
+        path.write_text('\n'.join(lines), encoding='utf-8')
+        logger.info(f"   MD: {path}")
+    
+    def _markdown_header(self, report: Dict) -> List[str]:
+        """Заголовок Markdown."""
+        s = report['summary']
+        return [
             "# Отчёт по проектированию архитектуры АСУ ТП",
             "",
             f"**Дата:** {report['metadata']['timestamp']}",
             f"**Run:** `{report['metadata']['run_name']}`",
+            f"**Секций:** {report['metadata']['sections_count']}",
             "",
             "## Резюме",
             "",
-            f"- **Сущностей:** {report['summary']['entities_count']}",
-            f"- **Топ-паттерн:** `{report['summary']['top_pattern']}`",
-            f"- **Score:** {report['summary']['quality_score']:.4f}",
-            f"- **Время:** {report['summary']['timings'].get('total', 0):.2f}с",
+            f"- **Сущностей:** {s['entities_count']}",
+            f"- **Топ-паттерн:** `{s.get('top_pattern', '—')}`",
+            f"- **Score:** {s.get('quality_score', 0):.4f}",
+            f"- **Время:** {s.get('timings', {}).get('total', 0):.2f}с",
+            "",
+            "---",
             "",
         ]
-        
-        for section in self.sections:
-            data = report.get(section.name, {})
-            if data and 'error' not in data:
-                lines.extend(["---", "", f"# {section.title}", ""])
-                lines.append(section.to_markdown(data))
-        
-        path = run_dir / "REPORT.md"
-        path.write_text('\n'.join(lines), encoding='utf-8')
 
 
 class ExtendedReportBuilder(ReportBuilder):
@@ -128,8 +164,8 @@ class ExtendedReportBuilder(ReportBuilder):
     def __init__(self, output_dir: str = "results/reports"):
         super().__init__(output_dir)
         
-        # Добавить остальные секции
-        self.sections.extend([
+        # Добавляем расширенные секции
+        extended = [
             ComponentModelBuilder(self.output_dir),
             TechStackRecommender(self.output_dir),
             WorkPlanBuilder(self.output_dir),
@@ -143,19 +179,11 @@ class ExtendedReportBuilder(ReportBuilder):
             TestPlanBuilder(self.output_dir),
             DeploymentPlanner(self.output_dir),
             SLAMetricsBuilder(self.output_dir),
-        ])
+        ]
         
-        # Сортировка по порядку
-        self.sections.sort(key=lambda s: s.order)
+        self.sections.extend(extended)
+        
+        # Сортируем по order
+        self.sections.sort(key=lambda s: getattr(s, 'order', 999))
         
         logger.info(f"ExtendedReportBuilder: {len(self.sections)} секций")
-    
-    def build(self, pipeline_result, context: Dict, run_name: str = None) -> Dict:
-        """Построить полный отчёт."""
-        report = super().build(pipeline_result, context, run_name)
-        
-        # Пересохранить с полным Markdown
-        run_dir = self.output_dir / f"run_{report['metadata']['run_name']}"
-        self._save_markdown(report, run_dir, base=False)
-        
-        return report
