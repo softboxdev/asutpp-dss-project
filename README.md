@@ -243,7 +243,7 @@ poetry install
 # 6. Проверить
 # Активация виртуального окружения
 
-poetry shell
+poetry env activate
 python --version
 python -c "import numpy, spacy, torch; print('OK')"
 
@@ -597,7 +597,7 @@ asutp-dss-local/
     └── unit
 ```
 
-# Проверка проект
+# Проверка проекта
 ```bash
 cd ~/projects/asutp-dss-local
 poetry run python -m src.main check

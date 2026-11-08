@@ -1,30 +1,48 @@
+"""Сборка полного отчёта на основе секций."""
 import json
 from pathlib import Path
 from datetime import datetime
-from typing import Dict, Optional
+from typing import Dict, Optional, List
 from loguru import logger
 
+from .base import ReportSection
 from .topology_graph import TopologyGraphBuilder
+from .component_model import ComponentModelBuilder
+from .tech_stack import TechStackRecommender
 from .architecture_examples import ArchitectureExamplesGenerator
 from .typical_implementations import TypicalImplementationsLibrary
 from .patterns_explorer import PatternsExplorer
 from .load_calculator import LoadCalculator
+from .work_plan import WorkPlanBuilder
+from .effort_estimator import EffortEstimator
+from .roadmap import RoadmapBuilder
+from .budget_estimator import BudgetEstimator
+from .team_plan import TeamPlanner
+from .risk_assessor import RiskAssessor
+from .traceability import TraceabilityBuilder
+from .compliance import ComplianceChecker
+from .test_plan import TestPlanBuilder
+from .deployment_plan import DeploymentPlanner
+from .sla_metrics import SLAMetricsBuilder
 
 
 class ReportBuilder:
-    """Сборка полного отчёта."""
+    """Базовый отчёт (5-6 секций)."""
     
     def __init__(self, output_dir: str = "results/reports"):
         self.output_dir = Path(output_dir)
         self.output_dir.mkdir(parents=True, exist_ok=True)
         
-        self.topology = TopologyGraphBuilder()
-        self.examples_gen = ArchitectureExamplesGenerator()
-        self.typical_lib = TypicalImplementationsLibrary()
-        self.patterns = PatternsExplorer()
-        self.load_calc = LoadCalculator()
+        # Базовые секции
+        self.sections: List[ReportSection] = [
+            TopologyGraphBuilder(self.output_dir),
+            ArchitectureExamplesGenerator(self.output_dir),
+            TypicalImplementationsLibrary(self.output_dir),
+            PatternsExplorer(self.output_dir),
+            LoadCalculator(self.output_dir),
+        ]
         
-        logger.info(f"ReportBuilder: {self.output_dir}")
+        logger.info(f"ReportBuilder: {len(self.sections)} секций")
     
     def build(
         self,
@@ -32,212 +50,140 @@ class ReportBuilder:
         context: Dict,
         run_name: Optional[str] = None,
     ) -> Dict:
-        """Собрать отчёт."""
+        """Построить отчёт."""
         if run_name is None:
             run_name = datetime.now().strftime("%Y%m%d_%H%M%S")
         
         run_dir = self.output_dir / f"run_{run_name}"
         run_dir.mkdir(parents=True, exist_ok=True)
         
-        # 1. Граф топологии
-        if pipeline_result.architectures:
-            arch = pipeline_result.architectures[0]
-            G = self.topology.build_from_architecture(arch)
-            topology_paths = self.topology.export_all(G, "topology")
+        # Меняем output_dir у секций на run_dir
+        for section in self.sections:
+            section.output_dir = run_dir
         
-        # 2. Примеры проектирования
-        if pipeline_result.architectures:
-            examples = self.examples_gen.generate(
-                pipeline_result.architectures[0], context
-            )
-        else:
-            examples = {}
-        
-        # 3. Типовые реализации
-        typical = self.typical_lib.get_for_pattern(
-            pipeline_result.patterns[0]['pattern']
-            if pipeline_result.patterns else 'layered'
-        )
-        
-        # 4. Паттерны
-        pattern_names = [p['pattern'] for p in pipeline_result.patterns]
-        patterns_info = {
-            name: self.patterns.get_pattern(name)
-            for name in pattern_names
-        }
-        
-        # 5. Расчёт нагрузки
-        load = self.load_calc.calculate(
-            architecture=pipeline_result.architectures[0] if pipeline_result.architectures else {},
-            context=context,
-            simulation_results=pipeline_result.quality_assessment,
-        )
-        
-        # === Сборка JSON-отчёта ===
-        report = {
+        # Базовый отчёт
+        report: Dict = {
             'metadata': {
                 'timestamp': datetime.now().isoformat(),
                 'run_name': run_name,
                 'context': context,
+                'sections_count': len(self.sections),
             },
             'summary': {
                 'entities_count': len(pipeline_result.requirements.get('entities', [])),
-                'top_pattern': pipeline_result.patterns[0]['pattern'] if pipeline_result.patterns else None,
+                'top_pattern': pipeline_result.patterns[0]['pattern'] 
+                    if pipeline_result.patterns else None,
                 'quality_score': pipeline_result.quality_assessment.get('overall_score'),
                 'timings': pipeline_result.timings,
             },
             'entities': pipeline_result.requirements.get('entities', [])[:50],
             'patterns': pipeline_result.patterns,
-            'patterns_info': patterns_info,
-            'examples': examples,
-            'typical_implementations': typical,
-            'load': load,
             'quality': pipeline_result.quality_assessment,
-            'topology_files': {
-                k: str(v) for k, v in topology_paths.items() if v
-            },
             'errors': pipeline_result.errors,
         }
         
-        # Сохранить JSON
-        json_path = run_dir / "report.json"
-        with open(json_path, 'w', encoding='utf-8') as f:
-            json.dump(report, f, ensure_ascii=False, indent=2, default=str)
+        # Строим все секции
+        for section in self.sections:
+            try:
+                logger.info(f"  Секция: {section.title}")
+                data = section.build(pipeline_result, context)
+                report[section.name] = data
+            except Exception as e:
+                logger.exception(f"  ❌ Ошибка в {section.name}: {e}")
+                report[section.name] = {'error': str(e)}
         
-        # Сохранить Markdown
-        md_path = self._save_markdown(report, run_dir)
+        # Сохраняем JSON и Markdown
+        self._save_json(report, run_dir)
+        self._save_markdown(report, run_dir)
         
         logger.info(f"✅ Отчёт: {run_dir}")
-        logger.info(f"   JSON: {json_path}")
-        logger.info(f"   MD:   {md_path}")
-        
         return report
     
-    def _save_markdown(self, report: Dict, run_dir: Path) -> Path:
-        """Сохранить Markdown-отчёт."""
-        path = run_dir / "REPORT.md"
+    def _save_json(self, report: Dict, run_dir: Path):
+        """Сохранить JSON."""
+        path = run_dir / "report.json"
+        with open(path, 'w', encoding='utf-8') as f:
+            json.dump(report, f, ensure_ascii=False, indent=2, default=str)
+        logger.info(f"   JSON: {path}")
+    
+    def _save_markdown(self, report: Dict, run_dir: Path):
+        """Сохранить Markdown."""
+        lines = self._markdown_header(report)
         
-        lines = [
+        # Каждая секция в своём формате
+        for section in self.sections:
+            data = report.get(section.name, {})
+            if not data or 'error' in data:
+                continue
+            
+            lines.append(f"## {section.title}")
+            lines.append("")
+            
+            try:
+                md = section.to_markdown(data)
+                if md:
+                    lines.append(md)
+                else:
+                    lines.append("```json")
+                    lines.append(json.dumps(data, ensure_ascii=False, indent=2, default=str)[:3000])
+                    lines.append("```")
+            except Exception as e:
+                lines.append(f"*Ошибка экспорта: {e}*")
+            
+            lines.append("")
+        
+        path = run_dir / "REPORT.md"
+        path.write_text('\n'.join(lines), encoding='utf-8')
+        logger.info(f"   MD: {path}")
+    
+    def _markdown_header(self, report: Dict) -> List[str]:
+        """Заголовок Markdown."""
+        s = report['summary']
+        return [
             "# Отчёт по проектированию архитектуры АСУ ТП",
             "",
             f"**Дата:** {report['metadata']['timestamp']}",
             f"**Run:** `{report['metadata']['run_name']}`",
+            f"**Секций:** {report['metadata']['sections_count']}",
             "",
             "## Резюме",
             "",
-            f"- **Сущностей извлечено:** {report['summary']['entities_count']}",
-            f"- **Топ-паттерн:** `{report['summary']['top_pattern']}`",
-            f"- **Score качества:** {report['summary']['quality_score']:.4f}",
-            f"- **Время:** {report['summary']['timings'].get('total', 0):.2f}с",
+            f"- **Сущностей:** {s['entities_count']}",
+            f"- **Топ-паттерн:** `{s.get('top_pattern', '—')}`",
+            f"- **Score:** {s.get('quality_score', 0):.4f}",
+            f"- **Время:** {s.get('timings', {}).get('total', 0):.2f}с",
             "",
-            "## Граф топологии",
+            "---",
             "",
-            f"Файлы:",
+        ]
+
+
+class ExtendedReportBuilder(ReportBuilder):
+    """Расширенный отчёт (18 секций)."""
+    
+    def __init__(self, output_dir: str = "results/reports"):
+        super().__init__(output_dir)
+        
+        # Добавляем расширенные секции
+        extended = [
+            ComponentModelBuilder(self.output_dir),
+            TechStackRecommender(self.output_dir),
+            WorkPlanBuilder(self.output_dir),
+            EffortEstimator(self.output_dir),
+            RoadmapBuilder(self.output_dir),
+            BudgetEstimator(self.output_dir),
+            TeamPlanner(self.output_dir),
+            RiskAssessor(self.output_dir),
+            TraceabilityBuilder(self.output_dir),
+            ComplianceChecker(self.output_dir),
+            TestPlanBuilder(self.output_dir),
+            DeploymentPlanner(self.output_dir),
+            SLAMetricsBuilder(self.output_dir),
         ]
         
-        for fmt, path in report['topology_files'].items():
-            lines.append(f"- `{fmt}`: `{path}`")
+        self.sections.extend(extended)
         
-        lines.extend([
-            "",
-            "### Mermaid-диаграмма",
-            "",
-            "```mermaid",
-            (run_dir / "topology.mmd").read_text(encoding='utf-8') 
-                if (run_dir / "topology.mmd").exists() else "graph TD",
-            "```",
-            "",
-            "## Архитектурные паттерны",
-            "",
-        ])
+        # Сортируем по order
+        self.sections.sort(key=lambda s: getattr(s, 'order', 999))
         
-        for name, info in report['patterns_info'].items():
-            lines.extend([
-                f"### {info.get('name', name)}",
-                "",
-                f"{info.get('description', '')}",
-                "",
-                "**Когда использовать:**",
-                *[f"- {w}" for w in info.get('when_to_use', [])],
-                "",
-                "**Плюсы:**",
-                *[f"+ {p}" for p in info.get('pros', [])],
-                "",
-                "**Минусы:**",
-                *[f"- {c}" for c in info.get('cons', [])],
-                "",
-                "**Пример:**",
-                info.get('example', ''),
-                "",
-                f"**Специфика АСУ ТП:** {info.get('asutp_specific', '')}",
-                "",
-            ])
-        
-        lines.extend([
-            "## Расчёт нагрузки",
-            "",
-            "### Входная нагрузка",
-            "",
-            "| Параметр | Значение |",
-            "|----------|----------|",
-        ])
-        
-        for k, v in report['load']['input_load'].items():
-            lines.append(f"| {k} | {v} |")
-        
-        lines.extend([
-            "",
-            "### Ресурсы (с резервом 30%)",
-            "",
-            "| Ресурс | Значение |",
-            "|--------|----------|",
-        ])
-        
-        for k, v in report['load']['resources']['with_reserve'].items():
-            lines.append(f"| {k} | {v} |")
-        
-        lines.extend([
-            "",
-            "### Рекомендуемые серверы",
-            "",
-            "| Роль | Кол-во | Спецификация | Причина |",
-            "|------|--------|--------------|---------|",
-        ])
-        
-        for s in report['load']['resources']['recommended_servers']:
-            lines.append(f"| {s['role']} | {s['count']} | {s['spec']} | {s['reason']} |")
-        
-        lines.extend([
-            "",
-            "### Узкие места",
-            "",
-        ])
-        
-        if report['load']['bottlenecks']:
-            for b in report['load']['bottlenecks']:
-                lines.append(f"- **{b['component']}** ({b['type']}): {', '.join(b['issues'])}")
-        else:
-            lines.append("- Узких мест не обнаружено ✅")
-        
-        lines.extend([
-            "",
-            "## Типовые реализации",
-            "",
-        ])
-        
-        for impl in report['typical_implementations']:
-            lines.extend([
-                f"### {impl['name']}",
-                "",
-                f"{impl['description']}",
-                "",
-                f"**Для чего:** {', '.join(impl['typical_for'])}",
-                "",
-                f"**Стандарты:** {', '.join(impl['standards'])}",
-                "",
-                impl['implementation'],
-                "",
-            ])
-        
-        path.write_text('\n'.join(lines), encoding='utf-8')
-        return path
+        logger.info(f"ExtendedReportBuilder: {len(self.sections)} секций")
